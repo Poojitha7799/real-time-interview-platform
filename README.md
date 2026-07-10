@@ -1,4 +1,4 @@
-# AI-Powered Real-Time Interview Platform
+# InterviewFlow: AI-Based Technical Interview & Coding Assessment Platform
 
 An AI-enabled full-stack interview platform that supports mock interviews, live technical interviews, role-based access, coding assessments, and interview management. The platform enables candidates to practice with AI as well as participate in real-time interviews conducted by human interviewers.
 
