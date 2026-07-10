@@ -1,186 +1,127 @@
 'use client';
-import React, { useState } from 'react';
 
-export default function RegisterAccountView() {
-  const [formData, setFormData] = useState({ username: '', email: '', password: '' });
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+
+export default function RegisterPage() {
+  const router = useRouter();
+  const [formData, setFormData] = useState({
+    username: '',
+    email: '',
+    password: '',
+  });
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    });
   };
 
-  const getPasswordStrength = (pass) => {
-    if (!pass) return { text: '', color: 'text-neutral-500' };
-    
-    let score = 0;
-    if (pass.length >= 8) score++;
-    if (/[A-Z]/.test(pass)) score++;
-    if (/[0-9]/.test(pass)) score++;
-    if (/[^A-Za-z0-9]/.test(pass)) score++;
-
-    switch (score) {
-      case 0:
-      case 1:
-        return { text: 'Weak (Must be 8+ chars with upper/number/special)', color: 'text-rose-500' };
-      case 2:
-      case 3:
-        return { text: 'Medium (Add upper, numbers, or special chars)', color: 'text-amber-500' };
-      case 4:
-        return { text: 'Strong Secure Matrix Signature', color: 'text-emerald-500' };
-      default:
-        return { text: '', color: 'text-neutral-500' };
-    }
-  };
-
-  const isPasswordValid = (pass) => {
-    return pass.length >= 8 && /[A-Z]/.test(pass) && /[0-9]/.test(pass) && /[^A-Za-z0-9]/.test(pass);
-  };
-
-  const handleFormSubmit = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    setSuccess('');
-    setSubmitting(true);
+    setLoading(true);
 
-    const emailLower = formData.email.toLowerCase().trim();
-
-    if (localStorage.getItem(`pass_${emailLower}`)) {
-      setError('Registration Rejected: An account already exists with this email address.');
-      setSubmitting(false);
-      return;
-    }
-
-    if (!isPasswordValid(formData.password)) {
-      setError('Registration Rejected: Password allocation does not meet the complexity safety matrix parameters.');
-      setSubmitting(false);
+    if (!formData.username || !formData.email || !formData.password) {
+      setError('All fields are required.');
+      setLoading(false);
       return;
     }
 
     try {
-      const response = await fetch('http://localhost:5001/api/auth/register', {
+      const res = await fetch('/api/auth/register', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
       });
 
-      const contentType = response.headers.get('content-type');
-      if (contentType && contentType.includes('application/json')) {
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.error || 'Server rejected registration.');
-        }
-      } else {
-        throw new Error('FallbackToLocal');
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || 'Internal Server Error');
+        setLoading(false);
+        return;
       }
 
-      localStorage.setItem(`pass_${emailLower}`, formData.password);
-      setSuccess('Profile saved to backend! Routing to login...');
-      setTimeout(() => {
-        window.location.href = '/login';
-      }, 1500);
-
+      router.push('/login');
     } catch (err) {
-      const designatedRole = emailLower.includes('recruiter') || emailLower.includes('hr') || emailLower.includes('interviewer') ? (emailLower.includes('interviewer') ? 'INTERVIEWER' : 'RECRUITER') : 'CANDIDATE';
-      
-      localStorage.setItem('userRole', designatedRole);
-      localStorage.setItem('userEmail', emailLower);
-      localStorage.setItem(`pass_${emailLower}`, formData.password);
-      
-      setSuccess('Registration handled locally! Routing to login portal...');
-      setTimeout(() => {
-        window.location.href = '/login';
-      }, 1500);
-    } finally {
-      setSubmitting(false);
+      setError('Internal Server Error');
+      setLoading(false);
     }
   };
 
-  const strength = getPasswordStrength(formData.password);
-
   return (
-    <div className="h-screen w-screen bg-neutral-950 text-neutral-100 flex items-center justify-center font-sans p-4 selection:bg-purple-500/30">
-      <div className="w-full max-w-md bg-neutral-900/40 border border-neutral-900 rounded-2xl p-8 backdrop-blur-sm shadow-[0_0_50px_rgba(0,0,0,0.3)]">
-        <header className="mb-6 text-center">
-          <h1 className="text-2xl font-bold tracking-tight">Create an Account</h1>
-          <p className="text-xs text-neutral-500 mt-1.5">Join InterviewFlow to start practicing mock technical interviews.</p>
-        </header>
+    <div className="h-screen w-screen bg-[#0a0a0a] flex items-center justify-center text-[#d4d4d4] font-sans antialiased p-4">
+      <div className="w-full max-w-md bg-[#141414] border border-neutral-900 rounded-2xl p-8 space-y-6">
+        <div className="text-center space-y-2 select-none">
+          <h1 className="text-2xl font-black uppercase tracking-wider text-neutral-100">CREATE AN ACCOUNT</h1>
+          <p className="text-xs text-neutral-500">Join InterviewFlow to start practicing mock technical interviews.</p>
+        </div>
 
-        {error && (
-          <div className="mb-4 text-xs font-mono bg-rose-950/30 border border-rose-900/40 text-rose-400 p-3 rounded-lg leading-relaxed">
-            ⚠️ {error}
-          </div>
-        )}
-        {success && (
-          <div className="mb-4 text-xs font-mono bg-emerald-950/30 border border-emerald-900/40 text-emerald-400 p-3 rounded-lg leading-relaxed">
-            ✅ {success}
-          </div>
-        )}
-
-        <form onSubmit={handleFormSubmit} className="space-y-4">
-          <div>
-            <label className="block text-[10px] font-bold text-neutral-500 uppercase tracking-wider mb-1.5">Username</label>
+        <form onSubmit={handleSubmit} className="space-y-5" autoComplete="off">
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider font-mono block">USERNAME</label>
             <input
               type="text"
               name="username"
-              required
               value={formData.username}
-              onChange={handleInputChange}
-              placeholder="e.g., candidate42"
-              className="w-full h-10 bg-neutral-950 border border-neutral-800 rounded-xl px-3.5 text-xs text-neutral-300 focus:outline-none focus:border-neutral-700 transition placeholder:text-neutral-700"
+              onChange={handleChange}
+              required
+              className="w-full block h-12 bg-black border border-neutral-800 rounded-xl px-4 text-sm font-mono outline-none text-neutral-200 focus:border-purple-600 transition"
             />
           </div>
 
-          <div>
-            <label className="block text-[10px] font-bold text-neutral-500 uppercase tracking-wider mb-1.5">Email Address</label>
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider font-mono block">EMAIL ADDRESS</label>
             <input
               type="email"
               name="email"
-              required
               value={formData.email}
-              onChange={handleInputChange}
-              placeholder="candidate@nitmanipur.ac.in"
-              className="w-full h-10 bg-neutral-950 border border-neutral-800 rounded-xl px-3.5 text-xs text-neutral-300 focus:outline-none focus:border-neutral-700 transition placeholder:text-neutral-700"
+              onChange={handleChange}
+              required
+              className="w-full block h-12 bg-black border border-neutral-800 rounded-xl px-4 text-sm font-mono outline-none text-neutral-200 focus:border-purple-600 transition"
             />
           </div>
 
-          <div>
-            <div className="flex justify-between items-center mb-1.5">
-              <label className="block text-[10px] font-bold text-neutral-500 uppercase tracking-wider">Password</label>
-              {strength.text && (
-                <span className={`text-[9px] font-mono font-bold tracking-wide uppercase ${strength.color}`}>
-                  {strength.text}
-                </span>
-              )}
-            </div>
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider font-mono block">PASSWORD</label>
             <input
               type="password"
               name="password"
-              required
               value={formData.password}
-              onChange={handleInputChange}
-              placeholder="••••••••••••"
-              className="w-full h-10 bg-neutral-950 border border-neutral-800 rounded-xl px-3.5 text-xs text-neutral-300 focus:outline-none focus:border-neutral-700 transition placeholder:text-neutral-700"
+              onChange={handleChange}
+              required
+              className="w-full block h-12 bg-black border border-neutral-800 rounded-xl px-4 text-sm font-mono outline-none text-neutral-200 focus:border-purple-600 transition"
             />
           </div>
 
+          {error && (
+            <div className="text-center pt-1 text-xs font-mono font-bold text-rose-500 flex items-center justify-center space-x-1.5 animate-pulse">
+              <span>⚠️</span>
+              <span>{error.toUpperCase()}</span>
+            </div>
+          )}
+
           <button
             type="submit"
-            disabled={submitting}
-            className="w-full h-10 mt-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold tracking-wide transition shadow-[0_0_20px_rgba(147,51,234,0.15)] disabled:opacity-50"
+            disabled={loading}
+            className="w-full h-14 bg-purple-600 hover:bg-purple-500 active:bg-purple-700 text-white font-mono font-black text-sm uppercase rounded-2xl tracking-wider transition-all shadow-lg shadow-purple-950/20 flex items-center justify-center mt-6 disabled:opacity-50"
           >
-            {submitting ? 'Creating Profile...' : 'Register Profile'}
+            {loading ? 'REGISTERING...' : 'REGISTER PROFILE'}
           </button>
         </form>
 
-        <footer className="mt-6 text-center text-[11px] text-neutral-500">
+        <div className="text-center text-xs text-neutral-500 font-mono select-none">
           Already have an operational account?{' '}
-          <a href="/login" className="text-purple-400 hover:underline">
+          <span onClick={() => router.push('/login')} className="text-purple-400 hover:underline cursor-pointer">
             Log in here
-          </a>
-        </footer>
+          </span>
+        </div>
       </div>
     </div>
   );

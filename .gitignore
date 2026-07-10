@@ -29,3 +29,6 @@ Thumbs.db
 
 # Misc
 *.pem
+
+client-app/AGENTS.md
+client-app/CLAUDE.md

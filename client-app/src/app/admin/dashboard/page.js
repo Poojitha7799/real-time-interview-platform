@@ -19,10 +19,10 @@ export default function AdminDashboard() {
 
   const fetchActiveSessions = async () => {
     try {
-      const res = await fetch('http://localhost:5001/api/admin/live-sessions');
+      const res = await fetch('/api/sessions/my-scheduled');
       if (res.ok) {
         const data = await res.json();
-        setSessions(data);
+        setSessions(Array.isArray(data) ? data : []);
       }
     } catch (err) {
       console.error("Failed to read system registry maps:", err);
@@ -39,13 +39,24 @@ export default function AdminDashboard() {
       return;
     }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(candidateEmail)) {
+      setStatusMessage('Error: Invalid candidate email formatting structure.');
+      return;
+    }
+
+    if (interviewerEmail && !emailRegex.test(interviewerEmail)) {
+      setStatusMessage('Error: Invalid interviewer email formatting structure.');
+      return;
+    }
+
     try {
-      const res = await fetch('http://localhost:5001/api/admin/schedule-interview', {
+      const res = await fetch('/api/sessions/my-scheduled', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          candidateEmail,
-          interviewerEmail,
+          candidateEmail: candidateEmail.toLowerCase().trim(),
+          interviewerEmail: interviewerEmail.toLowerCase().trim(),
           scheduledDate,
           scheduledTime
         })
@@ -74,14 +85,17 @@ export default function AdminDashboard() {
   };
 
   const filteredSessions = sessions.filter(session => {
-    if (!session.interviewer_email || session.interviewer_email === 'Unassigned') return false;
-    if (!session.candidate_email || session.candidate_email.trim() === '@' || session.candidate_email.trim() === '') return false;
+    const candidate = session.candidate_email || session.email || '';
+    const interviewer = session.interviewer_email || session.interviewer || '';
+
+    if (!interviewer || interviewer === 'Unassigned') return false;
+    if (!candidate || candidate.trim() === '@' || candidate.trim() === '') return false;
+    
     return true;
   });
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-200 antialiased font-sans selection:bg-purple-500/30 selection:text-purple-300">
-      
       <header className="h-16 border-b border-neutral-900 bg-neutral-950 px-8 flex items-center justify-between">
         <div className="flex items-center space-x-6">
           <div className="flex items-center space-x-2">
@@ -107,7 +121,6 @@ export default function AdminDashboard() {
       </header>
 
       <main className="max-w-7xl mx-auto p-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        
         <section className="lg:col-span-5 bg-neutral-900/30 border border-neutral-900 rounded-2xl p-6 backdrop-blur-md space-y-6">
           <div>
             <h2 className="text-base font-bold text-neutral-100 tracking-tight">Staging Dispatch Engine</h2>
@@ -201,10 +214,9 @@ export default function AdminDashboard() {
 
           <div className="mt-6 border border-neutral-900/80 rounded-xl overflow-hidden bg-neutral-950/40">
             <div className="grid grid-cols-12 bg-neutral-900/40 px-4 py-3 border-b border-neutral-900 text-[10px] uppercase font-bold tracking-wider text-neutral-400 font-mono">
-              <div className="col-span-3">Room ID</div>
+              <div className="col-span-4">Room ID</div>
               <div className="col-span-5">Candidate Node</div>
               <div className="col-span-3">Panel Operator</div>
-              <div className="col-span-1 text-right">Link</div>
             </div>
 
             <div className="divide-y divide-neutral-900/40 max-h-[460px] overflow-y-auto custom-scrollbar">
@@ -214,29 +226,20 @@ export default function AdminDashboard() {
                 </div>
               ) : (
                 filteredSessions.map((session) => (
-                  <div key={session.id} className="grid grid-cols-12 px-4 py-3.5 items-center text-xs hover:bg-neutral-900/10 transition">
-                    <div className="col-span-3 font-mono text-purple-400 font-bold uppercase tracking-wide">
-                      {session.id}
+                  <div key={session.id || session.room_id} className="grid grid-cols-12 px-4 py-3.5 items-center text-xs hover:bg-neutral-900/10 transition">
+                    <div className="col-span-4 font-mono text-purple-400 font-bold uppercase tracking-wide">
+                      {session.id || session.room_id}
                     </div>
                     <div className="col-span-5 space-y-0.5">
-                      <div className="text-neutral-200 truncate pr-2">{session.candidate_email}</div>
+                      <div className="text-neutral-200 truncate pr-2">
+                        {session.candidate_email || session.email}
+                      </div>
                       <div className="text-[10px] text-neutral-600 font-mono">
-                        {session.scheduled_date} @ {session.scheduled_time}
+                        {session.scheduled_date || session.date} @ {session.scheduled_time || session.time}
                       </div>
                     </div>
                     <div className="col-span-3 text-neutral-500 truncate pr-2 font-mono">
-                      {session.interviewer_email}
-                    </div>
-                    <div className="col-span-1 text-right">
-                      <a
-                        href={`/interview/${session.id}?role=interviewer&type=live`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex h-6 w-6 items-center justify-center bg-neutral-900 hover:bg-purple-950/40 border border-neutral-800 hover:border-purple-800/40 text-purple-400 rounded-md transition text-[11px]"
-                        title="Enter Interviewer Panel Workspace"
-                      >
-                        →
-                      </a>
+                      {session.interviewer_email || session.interviewer || 'Assigned'}
                     </div>
                   </div>
                 ))
@@ -244,7 +247,6 @@ export default function AdminDashboard() {
             </div>
           </div>
         </section>
-        
       </main>
     </div>
   );
