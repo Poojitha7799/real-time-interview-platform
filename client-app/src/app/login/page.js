@@ -1,8 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
+  const router = useRouter();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -29,41 +31,41 @@ export default function LoginPage() {
     }
 
     try {
-      // FIXED: Changed from http://localhost:5000/api/login to relative Next.js API route
-      const res = await fetch('/api/login', {
+      const res = await fetch('http://localhost:5001/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          email: formData.email.trim().toLowerCase(),
+          password: formData.password
+        }),
         credentials: 'include',
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        // FIXED: Dynamically bubbles the real error message sent from the server route
         setError(data.error || 'Authentication challenge failed.');
         setLoading(false);
         return;
       }
 
       if (data.user) {
-        document.cookie = `user_role=${data.user.role}; path=/; max-age=86400; SameSite=Lax`;
-        document.cookie = `user_email=${data.user.email}; path=/; max-age=86400; SameSite=Lax`;
-        
         const role = data.user.role.toLowerCase().trim();
 
         if (role === 'admin') {
-          window.location.href = '/admin/dashboard';
+          router.replace('/admin/dashboard');
         } else if (role === 'interviewer') {
-          window.location.href = '/interviewer/dashboard';
+          router.replace('/interviewer/dashboard');
+        } else if (role === 'candidate') {
+          router.replace('/');
         } else {
-          window.location.href = '/';
+          setError('Unknown user role configuration.');
+          setLoading(false);
         }
       }
     } catch (err) {
-      // FIXED: Fallback to capturing actual runtime communication problems
       setError(err.message || 'Connection lost with backend pipeline.');
       setLoading(false);
     }
@@ -86,6 +88,7 @@ export default function LoginPage() {
               value={formData.email}
               onChange={handleChange}
               required
+              suppressHydrationWarning={true}
               className="w-full block h-12 bg-black border border-neutral-800 rounded-xl px-4 text-sm font-mono outline-none text-neutral-200 focus:border-purple-600 transition"
             />
           </div>
@@ -98,6 +101,7 @@ export default function LoginPage() {
               value={formData.password}
               onChange={handleChange}
               required
+              suppressHydrationWarning={true}
               className="w-full block h-12 bg-black border border-neutral-800 rounded-xl px-4 text-sm font-mono outline-none text-neutral-200 focus:border-purple-600 transition"
             />
           </div>
@@ -112,6 +116,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
+            suppressHydrationWarning={true}
             className="w-full h-14 bg-purple-600 hover:bg-purple-500 active:bg-purple-700 text-white font-mono font-black text-sm uppercase rounded-2xl tracking-wider transition-all shadow-lg shadow-purple-950/20 flex items-center justify-center mt-6 disabled:opacity-50"
           >
             {loading ? 'SIGNING IN...' : 'AUTHENTICATE PROFILE'}
@@ -120,7 +125,7 @@ export default function LoginPage() {
 
         <div className="text-center text-xs text-neutral-500 font-mono select-none">
           Don't have an operational account?{' '}
-          <span onClick={() => window.location.href = '/register'} className="text-purple-400 hover:underline cursor-pointer">
+          <span onClick={() => router.push('/register')} className="text-purple-400 hover:underline cursor-pointer">
             Create an account
           </span>
         </div>

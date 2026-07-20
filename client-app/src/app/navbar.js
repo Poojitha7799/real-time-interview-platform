@@ -11,10 +11,19 @@ export default function GlobalWorkspaceNavbar() {
     }
   }, []);
 
-  const handleClearSessionLogout = () => {
+const handleLogout = async () => {
+  try {
+    await fetch('http://localhost:5001/api/auth/logout', {
+      method: 'POST',
+      credentials: 'include'
+    });
+
     localStorage.clear();
-    window.location.href = '/login';
-  };
+    router.push('/login');
+  } catch (err) {
+    console.error('Logout tracking error:', err);
+  }
+};
 
   return (
     <nav className="h-14 w-screen bg-neutral-900 border-b border-neutral-800 px-6 flex items-center justify-between font-sans fixed top-0 left-0 z-50">

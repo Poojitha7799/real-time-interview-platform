@@ -3,30 +3,48 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
-export default function HomePage() {
+function HomePage() {
   const router = useRouter();
   const [roomCode, setRoomCode] = useState('');
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   useEffect(() => {
-    const getCookie = (name) => {
-      const value = `; ${document.cookie}`;
-      const parts = value.split(`; ${name}=`);
-      if (parts.length === 2) return parts.pop().split(';').shift();
-      return null;
+    const checkAuth = async () => {
+      try {
+        const res = await fetch('http://localhost:5001/api/auth/me', {
+          method: 'GET',
+          credentials: 'include',
+        });
+
+        if (!res.ok) {
+          router.replace('/login');
+          return;
+        }
+
+        const data = await res.json();
+        
+        if (!data || !data.user) {
+          router.replace('/login');
+          return;
+        }
+
+        const role = data.user.role ? data.user.role.toLowerCase().trim() : '';
+
+        if (role === 'admin') {
+          router.replace('/admin/dashboard');
+        } else if (role === 'interviewer') {
+          router.replace('/interviewer/dashboard');
+        } else if (role === 'candidate') {
+          setIsCheckingAuth(false);
+        } else {
+          router.replace('/login');
+        }
+      } catch (error) {
+        router.replace('/login');
+      }
     };
 
-    const role = getCookie('user_role')?.toLowerCase().trim();
-
-    if (!role) {
-      window.location.href = '/login';
-    } else if (role === 'admin') {
-      window.location.href = '/admin/dashboard';
-    } else if (role === 'interviewer') {
-      window.location.href = '/interviewer/dashboard';
-    } else {
-      setIsCheckingAuth(false);
-    }
+    checkAuth();
   }, [router]);
 
   const handleJoinInterview = (e) => {
@@ -39,10 +57,22 @@ export default function HomePage() {
     router.push('/mock-practice');
   };
 
-  const handleLogout = () => {
-    document.cookie = 'user_role=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-    document.cookie = 'user_email=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-    window.location.href = '/login';
+  const handleLogout = async () => {
+    try {
+      const res = await fetch('http://localhost:5001/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include'
+      });
+
+      if (res.ok) {
+        localStorage.clear();
+        router.replace('/login');
+      } else {
+        console.error('Logout failed');
+      }
+    } catch (err) {
+      console.error('Logout tracking error:', err);
+    }
   };
 
   if (isCheckingAuth) {
@@ -57,7 +87,6 @@ export default function HomePage() {
     <div className="min-h-screen bg-neutral-950 text-neutral-200 flex flex-col font-sans antialiased selection:bg-purple-500/30">
       <style dangerouslySetInnerHTML={{ __html: `* { scrollbar-width: none !important; } *::-webkit-scrollbar { display: none !important; }` }} />
       
-      {/* Sleek Strategic Top Navbar */}
       <nav className="w-full h-16 bg-[#0e0e0e]/40 border-b border-neutral-900 px-8 flex items-center justify-between select-none fixed top-0 left-0 backdrop-blur-md z-50">
         <div className="flex items-center space-x-3">
           <span className="text-sm font-black tracking-wider text-neutral-100 uppercase">INTERVIEWFLOW</span>
@@ -79,7 +108,6 @@ export default function HomePage() {
         </div>
       </nav>
 
-      {/* Main Centered Content Wrapper */}
       <div className="flex-1 flex flex-col items-center justify-center p-6 mt-16">
         <div className="w-full max-w-md space-y-8 text-center" suppressHydrationWarning={true}>
           
@@ -132,3 +160,5 @@ export default function HomePage() {
     </div>
   );
 }
+
+export default HomePage;

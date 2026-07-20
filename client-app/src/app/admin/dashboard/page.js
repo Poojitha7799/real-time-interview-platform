@@ -79,11 +79,19 @@ export default function AdminDashboard() {
       setStatusMessage(`System Fault: ${err.message}`);
     }
   };
+const handleLogout = async () => {
+  try {
+    await fetch('http://localhost:5001/api/auth/logout', {
+      method: 'POST',
+      credentials: 'include'
+    });
 
-  const handleLogout = () => {
+    localStorage.clear();
     router.push('/login');
-  };
-
+  } catch (err) {
+    console.error('Logout tracking error:', err);
+  }
+};
   const filteredSessions = sessions.filter(session => {
     const candidate = session.candidate_email || session.email || '';
     const interviewer = session.interviewer_email || session.interviewer || '';

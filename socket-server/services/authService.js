@@ -1,48 +1,91 @@
-const db = require('../config/db');
-const bcrypt = require('bcryptjs'); 
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
+const db = require('../config/db'); 
 
-const loginUser = async ({ email, password }) => {
-  const [users] = await db.execute('SELECT * FROM interview_platform.users WHERE email = ?', [email]);
-  
-  // 👇 ADD THIS LOG LINE TO SEE EXACTLY WHAT NODE RECEIVES
-  console.log("-> Node Server received user array from DB:", users);
+const authenticateUser = async (email, password) => {
+  try {
+    const cleanEmail = email.trim().toLowerCase();
+    
+    const [users] = await db.execute('SELECT * FROM users WHERE email = ?', [cleanEmail]);
+    if (users.length === 0) {
+      return { success: false, error: 'Invalid email or password' };
+    }
 
-  if (!users || users.length === 0) {
-    throw new Error('No user profile matching that email was found in the system.');
+    const user = users[0];
+    const storedHash = user.password_hash || user.passwordHash || user.password;
+    
+    if (!storedHash) {
+      return { success: false, error: 'Authentication structural failure: Account configuration issue.' };
+    }
+
+    const isMatch = await bcrypt.compare(password, storedHash);
+    if (!isMatch) {
+      return { success: false, error: 'Invalid email or password' };
+    }
+
+    const token = jwt.sign(
+      { userId: user.id, email: user.email, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    return { success: true, token, user };
+  } catch (err) {
+    throw err;
   }
-
-  const user = users[0];
-  const databaseHash = user.password_hash || user.password;
-
-  if (!databaseHash) {
-    throw new Error('User found, but password column missing. Check table schema.');
-  }
-
-  const isMatch = await bcrypt.compare(password, databaseHash);
-  if (!isMatch) {
-    throw new Error('Invalid credentials profile match.');
-  }
-
-  const token = jwt.sign(
-    { id: user.id, role: user.role, email: user.email },
-    process.env.JWT_SECRET || 'fallback_secret_key',
-    { expiresIn: '8h' }
-  );
-
-  return { token, role: user.role };
 };
 
-const registerUser = async ({ username, email, password }) => {
-  const passwordHash = await bcrypt.hash(password, 10);
-  const [result] = await db.execute(
-    'INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)',
-    [username, email, passwordHash, 'candidate']
-  );
-  return { id: result.insertId, username, email };
+const registerUser = async (username, email, password) => {
+  try {
+    const cleanEmail = email.trim().toLowerCase();
+
+    const [existingUsers] = await db.execute('SELECT * FROM users WHERE email = ?', [cleanEmail]);
+    if (existingUsers.length > 0) {
+      return { success: false, error: 'Email is already registered' };
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    let result;
+    try {
+      [result] = await db.execute(
+        'INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)',
+        [username, cleanEmail, hashedPassword, 'candidate']
+      );
+    } catch (firstErr) {
+      try {
+        [result] = await db.execute(
+          'INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)',
+          [username, cleanEmail, hashedPassword, 'candidate']
+        );
+      } catch (secondErr) {
+        [result] = await db.execute(
+          'INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)',
+          [username, cleanEmail, hashedPassword, 'candidate']
+        );
+      }
+    }
+
+    const token = jwt.sign(
+      { userId: result.insertId, email: cleanEmail, role: 'candidate' },
+      process.env.JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    return {
+      success: true,
+      token,
+      user: { id: result.insertId, email: cleanEmail, role: 'candidate' }
+    };
+  } catch (err) {
+    console.error('\n❌ DATABASE CRASH DIAGNOSTICS:');
+    console.error(err.message);
+    console.error('--------------------------------');
+    throw err;
+  }
 };
 
 module.exports = {
-  loginUser,
+  authenticateUser,
   registerUser
 };
